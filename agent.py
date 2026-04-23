@@ -9,7 +9,6 @@ from langgraph.graph.message import add_messages
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
-# ── Load knowledge base ──────────────────────────────────────────────────────
 with open("knowledge_base.json") as f:
     KB = json.load(f)
 
@@ -26,19 +25,16 @@ POLICIES:
 - Trial: {KB['policies']['trial']}
 """.strip()
 
-# ── Mock lead capture tool ───────────────────────────────────────────────────
 def mock_lead_capture(name: str, email: str, platform: str):
-    print(f"\n[OK] Lead captured successfully: {name}, {email}, {platform}\n")
+    print(f"\n[LEAD CAPTURED] {name} | {email} | {platform}\n")
     return f"Lead captured: {name} ({email}) on {platform}"
 
-# ── LangGraph State ──────────────────────────────────────────────────────────
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     lead_info: dict
     lead_captured: bool
     collecting_lead: bool
 
-# ── LLM (lazy init) ──────────────────────────────────────────────────────────
 _llm = None
 
 def get_llm():
@@ -61,7 +57,6 @@ RULES:
 3. Never make up features or prices not in the knowledge base.
 """
 
-# ── Intent detection (purchase signals only, no false positives) ─────────────
 def detect_high_intent(text: str) -> bool:
     patterns = [
         r"\bsign\s*up\b", r"\bsubscribe\b", r"\bbuy\b", r"\bpurchase\b",
@@ -69,10 +64,8 @@ def detect_high_intent(text: str) -> bool:
         r"\bi want to (try|get|start|use)\b", r"\bi('d| would) like to (try|get|start|sign)\b",
         r"\bi'm in\b", r"\blet'?s go\b", r"\bsign me up\b", r"\bcount me in\b",
     ]
-    text_lower = text.lower()
-    return any(re.search(p, text_lower) for p in patterns)
+    return any(re.search(p, text.lower()) for p in patterns)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 def extract_email(text: str):
     match = re.search(r"[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}", text)
     return match.group(0) if match else None
@@ -80,13 +73,11 @@ def extract_email(text: str):
 PLATFORMS = ["youtube", "instagram", "tiktok", "twitter", "facebook", "linkedin", "twitch", "snapchat"]
 
 def extract_platform(text: str):
-    text_lower = text.lower()
     for p in PLATFORMS:
-        if p in text_lower:
+        if p in text.lower():
             return p.capitalize()
     return None
 
-# ── Agent node ────────────────────────────────────────────────────────────────
 def agent_node(state: AgentState) -> AgentState:
     messages = state["messages"]
     lead_info = dict(state.get("lead_info", {}))
@@ -97,7 +88,6 @@ def agent_node(state: AgentState) -> AgentState:
         (m.content for m in reversed(messages) if isinstance(m, HumanMessage)), ""
     )
 
-    # ── Lead collection mode ──────────────────────────────────────────────────
     if collecting and not captured:
         if "name" not in lead_info:
             lead_info["name"] = last_user_msg.strip()
@@ -140,7 +130,6 @@ def agent_node(state: AgentState) -> AgentState:
                 "lead_captured": True,
             }
 
-    # ── High-intent detection ─────────────────────────────────────────────────
     if detect_high_intent(last_user_msg) and not captured:
         return {
             "messages": [AIMessage(content="Great choice! To get you started, may I have your full name?")],
@@ -149,7 +138,6 @@ def agent_node(state: AgentState) -> AgentState:
             "lead_captured": False,
         }
 
-    # ── Standard RAG response ─────────────────────────────────────────────────
     chat_history = [SystemMessage(content=SYSTEM_PROMPT)] + messages
     ai_response = get_llm().invoke(chat_history)
     return {
@@ -159,7 +147,6 @@ def agent_node(state: AgentState) -> AgentState:
         "lead_captured": captured,
     }
 
-# ── Build LangGraph ───────────────────────────────────────────────────────────
 def build_graph():
     graph = StateGraph(AgentState)
     graph.add_node("agent", agent_node)
@@ -167,7 +154,6 @@ def build_graph():
     graph.add_edge("agent", END)
     return graph.compile()
 
-# ── CLI chat loop ─────────────────────────────────────────────────────────────
 def main():
     print("=" * 55)
     print("  AutoStream AI Sales Assistant (type 'quit' to exit)")
