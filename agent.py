@@ -43,7 +43,7 @@ def get_llm():
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("Set GEMINI_API_KEY environment variable.")
-        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=api_key, temperature=0.3)
+        _llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash-lite", google_api_key=api_key, temperature=0.3, request_timeout=60, max_retries=3)
     return _llm
 
 SYSTEM_PROMPT = f"""You are an AI sales assistant for AutoStream, a SaaS video editing platform.
